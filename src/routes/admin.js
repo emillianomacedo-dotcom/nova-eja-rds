@@ -55,7 +55,7 @@ router.put("/alunos/:id/bloquear", async (req, res, next) => {
 });
 
 // 3. Buscar relatório (JSON - usado pelo frontend para outros fins)
-router.get("/alunos/:id/relatorio", async (req, res, next) => {
+router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
   try {
     const { id } = req.params;
     const { data: form, error: errF } = await supabase
