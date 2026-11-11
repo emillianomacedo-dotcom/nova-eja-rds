@@ -13,7 +13,7 @@ import formulariosRoutes from "./routes/formularios.js";
 import experienciasRoutes from "./routes/experiencias.js";
 import iaRoutes from "./routes/ia.js";
 import chatRoutes from "./routes/chat.js";
-import adminRoutes from "./routes/admin.js"; // <-- IMPORTANTE: Adicionado aqui
+import adminRoutes from "./routes/admin.js"; // Rota do Painel do Coordenador (inclui PDF)
 
 import { errorHandler } from "./middlewares/errorHandler.js";
 
@@ -35,7 +35,9 @@ app.use(cors({
 
 // Configurações de segurança e parseamento de JSON
 app.use(helmet());
-app.use(express.json());
+
+// AUMENTANDO O LIMITE DO PAYLOAD PARA SUPORTAR HISTÓRICOS GRANDES
+app.use(express.json({ limit: '50mb' }));
 
 // ---------- ROTAS DA API ----------
 app.use("/api/alunos", alunosRoutes);
@@ -45,9 +47,10 @@ app.use("/api/ia", iaRoutes);
 app.use("/api/chat", chatRoutes);
 
 // ROTA DO ADMINISTRADOR (PAINEL DO COORDENADOR)
-app.use("/api/admin", adminRoutes); // <-- IMPORTANTE: Adicionado aqui
+app.use("/api/admin", adminRoutes);
 
 // ---------- MIDDLEWARE DE ERRO ----------
+// Deve ser o último app.use
 app.use(errorHandler);
 
 export default app;
