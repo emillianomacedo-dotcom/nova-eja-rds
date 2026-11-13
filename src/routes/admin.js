@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { supabase } from "../config/supabase.js";
 import { MATRIZ_FUNDAMENTAL, MATRIZ_MEDIO } from "../services/prompts.js";
-import PDFDocument from "pdfkit"; // Importação do PDFKit
+import PDFDocument from "pdfkit";
 
 const router = Router();
 
@@ -54,8 +54,8 @@ router.put("/alunos/:id/bloquear", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// 3. Buscar relatório (JSON - usado pelo frontend para outros fins)
-router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
+// 3. Buscar relatório (JSON)
+router.get("/alunos/:id/relatorio", async (req, res, next) => {
   try {
     const { id } = req.params;
     const { data: form, error: errF } = await supabase
@@ -84,12 +84,11 @@ router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// 4. NOVA ROTA: Gerar PDF diretamente no Backend
+// 4. Gerar PDF com Checkboxes (Backend)
 router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
   try {
     const { id } = req.params;
     
-    // Busca o formulário mais recente
     const { data: form, error: errF } = await supabase
       .from("formularios")
       .select("*")
@@ -101,7 +100,6 @@ router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
     if (errF) throw errF;
     if (!form) return res.status(404).json({ ok: false, mensagem: "Formulário não encontrado" });
 
-    // Busca as mensagens
     const { data: mensagens, error: errM } = await supabase
       .from("mensagens_chat")
       .select("*")
@@ -110,7 +108,6 @@ router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
       
     if (errM) throw errM;
 
-    // Busca o aluno
     const { data: aluno, error: errA } = await supabase
       .from("alunos")
       .select("*")
@@ -119,10 +116,13 @@ router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
       
     if (errA) throw errA;
 
+    // Define a matriz correta baseada no segmento
+    const isMedio = form.segmento && form.segmento.toLowerCase().includes("médio");
+    const matrizCompleta = isMedio ? MATRIZ_MEDIO : MATRIZ_FUNDAMENTAL;
+
     // Cria o documento PDF
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
     
-    // Configura a resposta para download
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=Relatorio_RDS_${aluno.nome_completo.replace(/\s+/g, '_')}.pdf`);
     
@@ -151,7 +151,7 @@ router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
     doc.text(`Status: Concluído`);
     doc.moveDown();
 
-    // Habilidades Reconhecidas
+    // Habilidades Reconhecidas pela IA
     const habilidadesMap = new Map();
     mensagens.forEach(msg => {
       if (msg.habilidade_id) {
@@ -182,7 +182,7 @@ router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
 
     doc.addPage();
 
-    // Relatos por Bloco
+    // --- RELATOS POR BLOCO (com Checkboxes) ---
     doc.fontSize(14).text('Relatos de Experiência por Bloco:', { underline: true });
     doc.moveDown();
 
@@ -218,6 +218,43 @@ router.get("/alunos/:id/relatorio.pdf", async (req, res, next) => {
           }
         });
         doc.moveDown();
+
+        // ADICIONA CHECKBOXES PARA BLOCOS 5, 6, 7 e 8
+        if (i >= 5) {
+          doc.fontSize(12).text('Validação do Professor:', { underline: true });
+          doc.moveDown(0.5);
+          
+          let areaNome = "";
+          if (i === 5) areaNome = "LINGUAGENS";
+          else if (i === 6) areaNome = "MATEMÁTICA";
+          else if (i === 7) areaNome = "CIÊNCIAS DA NATUREZA";
+          else if (i === 8) areaNome = "CIÊNCIAS HUMANAS";
+
+          // Extrai as habilidades da matriz
+          const extrairHabilidades = (matriz, area) => {
+            const regex = new RegExp(`\\[${area}\\]([\\s\\S]*?)(?=\\[|$)`, 'i');
+            const match = matriz.match(regex);
+            if (!match) return [];
+            return match[1].split('\n')
+              .filter(l => l.trim().startsWith('H'))
+              .map(l => l.trim());
+          };
+
+          const habilidadesArea = extrairHabilidades(matrizCompleta, areaNome);
+          
+          if (habilidadesArea.length > 0) {
+            habilidadesArea.forEach(h => {
+              // Desenha o checkbox (quadradinho vazio)
+              doc.rect(doc.x, doc.y, 10, 10).stroke();
+              // Escreve o texto ao lado
+              doc.fontSize(9).text(`  ${h}`, doc.x + 15, doc.y - 2);
+              doc.moveDown(0.8);
+            });
+          } else {
+            doc.fontSize(10).text('[ ] Nenhuma habilidade encontrada na matriz para esta área.');
+          }
+          doc.moveDown();
+        }
       }
     }
 
