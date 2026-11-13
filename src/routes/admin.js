@@ -2,7 +2,7 @@ import { Router } from "express";
 import { supabase } from "../config/supabase.js";
 import { MATRIZ_FUNDAMENTAL, MATRIZ_MEDIO } from "../services/prompts.js";
 import PDFDocument from "pdfkit";
-
+//teste
 const router = Router();
 
 // 1. Listar todos os alunos
